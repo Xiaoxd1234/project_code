@@ -11,7 +11,6 @@ player_state = {
     "enemies_defeated": 0
 }
 
-
 # 定义敌人字典
 enemies = {
     1: {"name": "Goblin", "health": 8, "attack": 2, "experience": 5, "gold": 3},
