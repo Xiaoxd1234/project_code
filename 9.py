@@ -176,7 +176,7 @@ if __name__ == "__main__":
         print(f"{enemy_id}. {enemy['name']}")
     
     enemy_choice = get_menu_choice("Enter enemy number:", ["1", "2", "3", "4"])
-    
+
     # 开始战斗
     updated_state = combat_encounter(player_state, int(enemy_choice))
     
