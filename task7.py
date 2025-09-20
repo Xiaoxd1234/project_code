@@ -65,17 +65,7 @@ class TextProcessor:
         # 合并词频
         for word, freq in new_word_freq.items():
             self.word_freq[word] = self.word_freq.get(word, 0) + freq
-        # 重新生成并覆盖词汇文件
-        with open("word_freq.txt", "w", encoding="utf-8") as f:
-            for word, freq in sorted(self.word_freq.items(), key=lambda x: -x[1]):
-                f.write(f"{word} {freq}\n")
-        word_list = sorted(self.word_freq.keys())
-        with open("word2idx.txt", "w", encoding="utf-8") as f:
-            for idx, word in enumerate(word_list):
-                f.write(f"{word} {idx}\n")
-        with open("idx2word.txt", "w", encoding="utf-8") as f:
-            for idx, word in enumerate(word_list):
-                f.write(f"{idx} {word}\n")
+        self.save()
 
     def delete_file(self, delete_file_path: str) -> None:
         import pandas as pd
@@ -108,17 +98,7 @@ class TextProcessor:
                 self.word_freq[word] -= freq
                 if self.word_freq[word] <= 0:
                     del self.word_freq[word]
-        # 重新生成并覆盖词汇文件
-        with open("word_freq.txt", "w", encoding="utf-8") as f:
-            for word, freq in sorted(self.word_freq.items(), key=lambda x: -x[1]):
-                f.write(f"{word} {freq}\n")
-        word_list = sorted(self.word_freq.keys())
-        with open("word2idx.txt", "w", encoding="utf-8") as f:
-            for idx, word in enumerate(word_list):
-                f.write(f"{word} {idx}\n")
-        with open("idx2word.txt", "w", encoding="utf-8") as f:
-            for idx, word in enumerate(word_list):
-                f.write(f"{idx} {word}\n")
+        self.save()
 
     def load(self) -> None:
         # 恢复 word_freq
@@ -163,4 +143,3 @@ if __name__ == "__main__":
         corpus_filepath="data/ag_news_test.csv",
         idx2label_filepath="data/idx2label.json",
     )
-    tp.save()

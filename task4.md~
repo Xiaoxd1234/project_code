@@ -59,9 +59,6 @@ same outputs as function get_vocabs
 
 本任务你需要：
 - 加载 stop_words_english.txt 文件中提供的停用词。
-
-
-## 重点:
 - 修改 get_vocabs 函数，在生成词汇表时排除停用词。
 
 此外，你的函数还应：
