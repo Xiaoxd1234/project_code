@@ -1,0 +1,15 @@
+book_id,type,copies,title,author,year,keywords
+P0001,physical,3,Introduction to Python Programming,S Gowrishankar,2019,python:programming
+P0007,physical,2,The Art of Computer Programming,Donald Knuth,1997,algorithms:computer science
+E0001,online,0,Python Crash Course,Eric Matthes,2015,python:programming
+P0005,physical,1,Deep Learning,Ian Goodfellow,2016,AI:deep learning:neural networks
+E0002,online,0,Deep learning with Python: a hands-on introduction,Ketkar Nikhil,2017,programming:ML:python
+P0006,physical,1,Hands-On ML,Aurelien Geron,2019,ML:AI:python
+E0003,online,0,Machine Learning for Business,Doug Hudgeon & Richard Nichol,2020,ML:business:python
+P0008,physical,2,The Hobbit,J.R.R. Tolkien,1937,fantasy:novel:classic
+P0019,physical,4,Principles of Marketing,Philip Kotler,2016,marketing:business:strategy
+P0002,physical,5,Python Programming: An Introduction to Computer Science,John M. Zelle, 2002,python:CS:programming
+P0003,physical,2,Python Crash Course,Eric Matthes,2023,python:programming
+E0004,online,3,Speech and Language Processing,Dan Jurafsky & James H. Martin,2025,natural language processing:ML
+P0004,physical,1,The Hitchhiker's Guide to the Galaxy,Douglas Adams,1985,novel:comedy:science
+P0009,physical,1,Bad Science: A hilarious and informative Sunday Times bestseller on bad science in healthcare,Ben Goldacre,2008,science:statistics:healthcare

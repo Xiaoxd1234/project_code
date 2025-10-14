@@ -1,0 +1,2 @@
+book_id,type,copies,title,author,year,keywords
+P01,textbook,3,Introduction to Python Programming,S Gowrishankar,2019,python:programming
