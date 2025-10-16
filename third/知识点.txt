@@ -1,0 +1,3 @@
+第二大块是Set 2 - Exceptions, Unit Testing and Recursion  这几个知识点
+
+就1-3，4-6抽取幸运观众，主要是能体现讲oop基础和 inherence 还有polymorphism， Exceptions, Unit Testing and Recursion  这几个知识点
