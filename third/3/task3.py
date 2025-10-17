@@ -80,8 +80,9 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
             print("2. View account policies")
             print("3. View my loans")
             print("4. Borrow and Return")
+            print("5. Search by Keywords")
             if current_user.is_library_staff():
-                print("5. Library Report")
+                print("6. Manage Library")
             print("="*34)
             
             while True:
@@ -183,21 +184,119 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                             else:
                                 print(f"Returned '{b.title}' by {b.author} ({b.year}).")
                             loan_to_return['returned_date'] = user.TODAY
+                        elif cmd.lower().startswith("renew "):
+                            renew_id = cmd[6:].strip()
+                            # 找到最早到期且未归还的副本
+                            active_loans = [l for l in current_user.loans if l['book_ID'] == renew_id and not l.get('returned_date')]
+                            if not active_loans:
+                                print(f"No loan record for {renew_id}.")
+                                continue
+                            loan_to_renew = sorted(active_loans, key=lambda l: l['due_date'])[0]
+                            b = book.Book.find_book_by_id(renew_id)
+                            if b is None:
+                                print(f"未找到ID为{renew_id}的书籍信息。")
+                                continue
+                            # 续借资格判断
+                            fines = current_user.get_total_fines()
+                            if fines > 0:
+                                print("Renewal denied: You have unpaid fines.")
+                                continue
+                            if current_user.has_renewed(renew_id):
+                                print("Renewal unavailable: Each book can only be renewed once.")
+                                continue
+                            due = datetime.datetime.strptime(loan_to_renew['due_date'], '%d/%m/%Y')
+                            today = datetime.datetime.strptime(user.TODAY, '%d/%m/%Y')
+                            new_due = due + datetime.timedelta(days=5)
+                            if new_due < today:
+                                print("Renewal denied: This book is already overdue.")
+                                continue
+                            # 续借成功
+                            loan_to_renew['due_date'] = new_due.strftime('%d/%m/%Y')
+                            loan_to_renew['renewed'] = True
+                            print(f"Renew '{b.title}' by {b.author} ({b.year}) successfully. New due date: {loan_to_renew['due_date']}")
                         else:
                             continue
                     break
-                elif choice == "5" and current_user.is_library_staff():
-                    # 图书馆报告
-                    students = [u for u in user.User.users if u.role == "Student"]
-                    staffs = [u for u in user.User.users if u.role == "Staff"]
-                    others = [u for u in user.User.users if u.role == "Others"]
-                    total_books = len(book.Book.books)
-                    physical_books = [b for b in book.Book.books if b.is_physical_book()]
-                    online_books = [b for b in book.Book.books if b.is_online_book()]
-                    available_physical = sum(1 for b in physical_books if b.available_copies(b.get_active_loan_count(loans)) > 0)
-                    print("Library Report")
-                    print(f"- {len(user.User.users)} users, including {len(students)} student(s), {len(staffs)} staff and {len(others)} others.")
-                    print(f"- {total_books} books, including {len(physical_books)} physical book(s) ({available_physical} currently available) and {len(online_books)} online book(s).")
+                elif choice == "5":
+                    # 按关键词搜索
+                    keywords_input = input("Enter search keywords (separated by comma): ").strip()
+                    keywords = [k.strip().lower() for k in keywords_input.split(",") if k.strip()]
+                    if not keywords:
+                        print("Found 0 book(s).")
+                        break
+                    results = []
+                    for b in book.Book.books:
+                        match_count = b.match_keywords(keywords)
+                        if match_count > 0:
+                            results.append((b, match_count))
+                    # 排序：匹配数量（降序）、年份（降序）、ID（升序）
+                    results.sort(key=lambda x: (-x[1], -int(x[0].year), x[0].book_ID))
+                    print(f"Found {len(results)} book(s).")
+                    for idx, (b, _) in enumerate(results):
+                        print(f"{idx+1}. {b.book_ID} '{b.title}' by {b.author} ({b.year}).")
+                    break
+                elif choice == "6" and current_user.is_library_staff():
+                    # Manage Library
+                    while True:
+                        cmd = input("> ").strip().lower()
+                        if cmd == "quit":
+                            break
+                        elif cmd == "report":
+                            students = [u for u in user.User.users if u.role == "Student"]
+                            staffs = [u for u in user.User.users if u.role == "Staff"]
+                            others = [u for u in user.User.users if u.role == "Others"]
+                            total_books = len(book.Book.books)
+                            physical_books = [b for b in book.Book.books if b.is_physical_book()]
+                            online_books = [b for b in book.Book.books if b.is_online_book()]
+                            available_physical = sum(1 for b in physical_books if b.available_copies(b.get_active_loan_count(loans)) > 0)
+                            print("Library Report")
+                            print(f"- {len(user.User.users)} users, including {len(students)} student(s), {len(staffs)} staff and {len(others)} others.")
+                            print(f"- {total_books} books, including {len(physical_books)} physical book(s) ({available_physical} currently available) and {len(online_books)} online book(s).")
+                        elif cmd == "add physical":
+                            title = input("Title: ").strip()
+                            author = input("Authors: ").strip()
+                            year = input("Year: ").strip()
+                            copies = input("Copies: ").strip()
+                            if not title or not author or not year or not copies:
+                                print("All fields are required.")
+                                continue
+                            try:
+                                year = int(year)
+                                total_copy = int(copies)
+                                if total_copy <= 0:
+                                    print("Number of copies must be positive.")
+                                    continue
+                            except ValueError:
+                                print("Year and copies must be numbers.")
+                                continue
+                            # 自动分配ID和关键词
+                            new_id = book.Book.generate_new_id("physical")
+                            all_keywords = book.Book.get_all_keywords()
+                            auto_keywords = book.Book.extract_keywords_from_title(title, all_keywords)
+                            new_book = book.Book(new_id, "physical", total_copy, title, author, year, auto_keywords)
+                            print(f"Detected keywords: {':'.join(auto_keywords) if auto_keywords else 'None'}")
+                            print(f"Adding {new_id} '{title}' by {author} ({year}).")
+                        elif cmd == "add online":
+                            title = input("Title: ").strip()
+                            author = input("Authors: ").strip()
+                            year = input("Year: ").strip()
+                            if not title or not author or not year:
+                                print("All fields are required.")
+                                continue
+                            try:
+                                year = int(year)
+                            except ValueError:
+                                print("Year must be a number.")
+                                continue
+                            # 自动分配ID和关键词
+                            new_id = book.Book.generate_new_id("online")
+                            all_keywords = book.Book.get_all_keywords()
+                            auto_keywords = book.Book.extract_keywords_from_title(title, all_keywords)
+                            new_book = book.Book(new_id, "online", 0, title, author, year, auto_keywords)
+                            print(f"Detected keywords: {':'.join(auto_keywords) if auto_keywords else 'None'}")
+                            print(f"Adding {new_id} '{title}' by {author} ({year}).")
+                        else:
+                            continue
                     break
                 # Invalid choice - continue the inner loop to re-prompt without reprinting menu
             

@@ -72,6 +72,30 @@ class User(ABC):
                 if overdue_days > 0:
                     overdue.append(loan)
         return overdue
+
+    def can_renew(self, book_id, today_str=None):
+        # 判断用户是否可以续借指定书籍
+        for loan in self.loans:
+            if loan['book_id'] == book_id and loan['type'] == 'physical' and not loan.get('returned_date'):
+                # 已续借过不可再续借
+                if loan.get('renewed'):
+                    return False, "该书已续借过，不能再次续借。"
+                # 已逾期不可续借
+                grace, _ = self.get_fine_policy()
+                today = datetime.datetime.strptime(today_str or TODAY, '%d/%m/%Y')
+                due = datetime.datetime.strptime(loan['due_date'], '%d/%m/%Y')
+                overdue_days = (today - due).days - grace
+                if overdue_days > 0:
+                    return False, "该书已逾期，不能续借。"
+                return True, ""
+        return False, "未找到可续借的借阅记录。"
+
+    def has_renewed(self, book_id):
+        # 判断某本书是否已续借过
+        for loan in self.loans:
+            if loan['book_ID'] == book_id and loan['type'] == 'physical' and not loan.get('returned_date'):
+                return loan.get('renewed', False)
+        return False
     #静态方法
     @staticmethod
     def find_user_by_id(user_id):
