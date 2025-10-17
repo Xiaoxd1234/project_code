@@ -95,10 +95,11 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                 elif choice == "2":
                     total, physical, online = current_user.get_loan_count()
                     fines = current_user.get_total_fines()
-                    print(f"{current_user.role} {current_user.name}. Policies: maximum of {current_user.days_allowed} days, {current_user.quota} items. Current loans: {total} ({physical} physical / {online} online). Fines: $ {fines:.2f}")
+                    policy = current_user.get_policy()
+                    print(f"{current_user.role} {current_user.name}. Policies: maximum of {policy['days_allowed']} days, {policy['quota']} items. Current loans: {total} ({physical} physical / {online} online). Fines: $ {fines:.2f}")
                     break
                 elif choice == "3":
-                    active_loans = [l for l in current_user.loans if not l['returned_date']]
+                    active_loans = current_user.get_active_loans()
                     print(f"You currently have {len(active_loans)} loan(s).")
                     for idx, l in enumerate(sorted(active_loans, key=lambda x: x['due_date'])):
                         b = book.Book.find_book_by_id(l['book_ID'])
@@ -140,19 +141,20 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                                     print("未找到该书籍ID，请重新输入。")
                                     continue
                                 # 先检查额度和罚款
+                                policy = current_user.get_policy()
                                 total, physical, online = current_user.get_loan_count()
                                 fines = current_user.get_total_fines()
                                 if fines > 0:
                                     print("Borrowing unavailable: unpaid fines. Review your loan details for more info.")
                                     break
-                                if total >= current_user.quota:
+                                if total >= policy['quota']:
                                     print("Borrowing unavailable: quota exceeded. Review your loan details for more info.")
                                     break
                                 if not b.can_borrow(loans):
                                     print("No available copies.")
                                     break
                                 # 借书成功
-                                due_date = (datetime.datetime.strptime(user.TODAY, '%d/%m/%Y') + datetime.timedelta(days=current_user.days_allowed)).strftime('%d/%m/%Y')
+                                due_date = (datetime.datetime.strptime(user.TODAY, '%d/%m/%Y') + datetime.timedelta(days=policy['days_allowed'])).strftime('%d/%m/%Y')
                                 new_loan = {'user_ID': current_user.user_ID, 'book_ID': b.book_ID, 'borrow_date': user.TODAY, 'due_date': due_date, 'returned_date': '', 'type': b.book_type}
                                 loans.append(new_loan)
                                 current_user.loans.append(new_loan)
@@ -186,7 +188,12 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                             loan_to_return['returned_date'] = user.TODAY
                         elif cmd.lower().startswith("renew "):
                             renew_id = cmd[6:].strip()
-                            # 找到最早到期且未归还的副本
+                            # 1. 首先检查用户是否有未支付罚款（最高优先级）
+                            fines = current_user.get_total_fines()
+                            if fines > 0:
+                                print("Renewal denied: You have unpaid fines.")
+                                continue
+                            # 2. 检查借阅记录是否存在
                             active_loans = [l for l in current_user.loans if l['book_ID'] == renew_id and not l.get('returned_date')]
                             if not active_loans:
                                 print(f"No loan record for {renew_id}.")
@@ -196,11 +203,7 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                             if b is None:
                                 print(f"未找到ID为{renew_id}的书籍信息。")
                                 continue
-                            # 续借资格判断
-                            fines = current_user.get_total_fines()
-                            if fines > 0:
-                                print("Renewal denied: You have unpaid fines.")
-                                continue
+                            # 3. 检查是否已续借过
                             if current_user.has_renewed(renew_id):
                                 print("Renewal unavailable: Each book can only be renewed once.")
                                 continue

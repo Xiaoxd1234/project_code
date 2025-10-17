@@ -1,13 +1,7 @@
 from abc import ABC, abstractmethod
 import csv
-import datetime
-import re
-#父类子类继承
+
 class User(ABC):
-    """
-    an abstract parent class representing all kinds of library users
-    """
-    # a list of all library users
     users = []
 
     def __init__(self, user_ID, name, password, role, department):
@@ -16,8 +10,6 @@ class User(ABC):
         self.password = password
         self.role = role
         self.department = department or ""
-        self.days_allowed = None
-        self.quota = None
         self.loans = []
         User.users.append(self)
 
@@ -30,11 +22,19 @@ class User(ABC):
     def check_password(self, password):
         return self.password == password
 
+    @abstractmethod
+    def get_policy(self) -> dict[str, int]:
+        pass
+
     def get_loan_count(self):
-        physical = sum(1 for loan in self.loans if loan['type'] == 'physical')
-        online = sum(1 for loan in self.loans if loan['type'] == 'online')
-        return len(self.loans), physical, online
-    #静态方法
+        physical = sum(1 for loan in self.loans if loan['type'] == 'physical' and not loan.get('returned_date'))
+        online = sum(1 for loan in self.loans if loan['type'] == 'online' and not loan.get('returned_date'))
+        total = physical + online
+        return total, physical, online
+
+    def get_active_loans(self):
+        return [l for l in self.loans if not l.get('returned_date')]
+
     @staticmethod
     def find_user_by_id(user_id):
         for user in User.users:
@@ -62,21 +62,21 @@ class User(ABC):
 
 class Student(User):
     def __init__(self, user_ID, name, password, department):
-        super().__init__(user_ID, name, password, role="Student", department=department)
-        self.days_allowed = 10
-        self.quota = 4
+        super().__init__(user_ID, name, password, "Student", department)
+    def get_policy(self):
+        return {"days_allowed": 10, "quota": 4}
 
 class Staff(User):
     def __init__(self, user_ID, name, password, department):
-        super().__init__(user_ID, name, password, role="Staff", department=department)
-        self.days_allowed = 14
-        self.quota = 6
+        super().__init__(user_ID, name, password, "Staff", department)
+    def get_policy(self):
+        return {"days_allowed": 14, "quota": 6}
 
 class Others(User):
     def __init__(self, user_ID, name, password):
-        super().__init__(user_ID, name, password, role="Others", department="")
-        self.days_allowed = 7
-        self.quota = 2
+        super().__init__(user_ID, name, password, "Others", "")
+    def get_policy(self):
+        return {"days_allowed": 7, "quota": 2}
         
         
 

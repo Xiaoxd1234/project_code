@@ -18,8 +18,6 @@ class User(ABC):
         self.password = password
         self.role = role
         self.department = department or ""
-        self.days_allowed = None
-        self.quota = None
         self.loans = []
         User.users.append(self)
 
@@ -31,6 +29,15 @@ class User(ABC):
 
     def check_password(self, password):
         return self.password == password
+
+    @abstractmethod
+    def get_policy(self) -> dict:
+        """返回用户的借阅政策，包含days_allowed和quota"""
+        pass
+
+    def get_active_loans(self):
+        """返回所有未归还的借阅记录"""
+        return [l for l in self.loans if not l.get('returned_date')]
 
     def get_loan_count(self):
         physical = sum(1 for loan in self.loans if loan['type'] == 'physical' and not loan.get('returned_date'))
@@ -101,18 +108,21 @@ class User(ABC):
 class Student(User):
     def __init__(self, user_ID, name, password, department):
         super().__init__(user_ID, name, password, role="Student", department=department)
-        self.days_allowed = 10
-        self.quota = 4
+    
+    def get_policy(self) -> dict:
+        return {"days_allowed": 10, "quota": 4}
 
 class Staff(User):
     def __init__(self, user_ID, name, password, department):
         super().__init__(user_ID, name, password, role="Staff", department=department)
-        self.days_allowed = 14
-        self.quota = 6
+    
+    def get_policy(self) -> dict:
+        return {"days_allowed": 14, "quota": 6}
 
 class Others(User):
     def __init__(self, user_ID, name, password):
         super().__init__(user_ID, name, password, role="Others", department="")
-        self.days_allowed = 7
-        self.quota = 2
+    
+    def get_policy(self) -> dict:
+        return {"days_allowed": 7, "quota": 2}
         

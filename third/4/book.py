@@ -1,6 +1,7 @@
 import csv
 import datetime
 import re
+from custom_errors import CustomValueError, CustomTypeError, MissingRequiredFieldError
 
 class Book:
     """
@@ -10,24 +11,47 @@ class Book:
     books = []
 
     def __init__(self, book_ID, book_type, total_copy, title, author, year, keywords=None):
+        
+        # 类型检查
+        if book_type not in ["physical", "online"]:
+            raise CustomValueError(f"Invalid book type: {book_type}")
+        if not title or not author or not year:
+            raise MissingRequiredFieldError("Title, author, and year are required fields.")
+        try:
+            self.year = int(year)
+            assert self.year > 0, "Year must be positive."
+        except Exception:
+            raise CustomValueError("Year must be a positive integer.")
+        try:
+            self.total_copy = int(total_copy)
+            assert self.total_copy > 0, "Copies must be positive."
+        except Exception:
+            raise CustomValueError("Copies must be a positive integer.")
         self.book_ID = book_ID
         self.book_type = book_type
-        self.total_copy = int(total_copy)
         self.title = title
         self.author = author
-        self.year = int(year)
-        # 支持传入None、list或字符串
+        # 关键词处理
+        self.keywords = []
         if keywords is None:
-            self.keywords = []
+            pass
         elif isinstance(keywords, list):
-            self.keywords = keywords
+            for key in keywords:
+                if not re.fullmatch(r'[A-Za-z0-9\-]+', key.strip()):
+                    raise CustomValueError(f"Invalid keyword: {key.strip()}")
+                self.keywords.append(key.strip())
         elif isinstance(keywords, str):
-            self.keywords = []
             if keywords:
                 for key in keywords.split(":"):
+                    if not re.fullmatch(r'[A-Za-z0-9\-]+', key.strip()):
+                        raise CustomValueError(f"Invalid keyword: {key.strip()}")
                     self.keywords.append(key.strip())
         else:
-            raise TypeError("keywords must be None, list or str")
+            raise CustomTypeError("Keywords must be None, list, or str")
+        if len(self.keywords) > 5:
+            raise CustomValueError("A book can have at most 5 keywords")
+        assert self.total_copy > 0, "Book copies must be positive."
+        assert self.year > 0, "Book year must be positive."
         Book.books.append(self)
 
     def match_keywords(self, search_keywords):
@@ -80,25 +104,34 @@ class Book:
 
     @staticmethod
     def find_book_by_id(book_id):
+        from custom_errors import BookNotFoundError
         for book in Book.books:
             if book.book_ID == book_id:
                 return book
-        return None
+        raise BookNotFoundError(f"Book with ID {book_id} not found.")
 
     @staticmethod
     def load_books_from_csv(file_path):
+        from custom_errors import MissingRequiredFieldError, CustomValueError, CustomTypeError
         Book.books.clear()
         with open(file_path, newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                book_ID = row['book_id']
-                book_type = row['type']
-                total_copy = row['copies']
-                title = row['title']
-                author = row['author']
-                year = row['year']
+                book_ID = row.get('book_id')
+                book_type = row.get('type')
+                total_copy = row.get('copies')
+                title = row.get('title')
+                author = row.get('author')
+                year = row.get('year')
                 keywords = row.get('keywords', "")
-                Book(book_ID, book_type, total_copy, title, author, year, keywords)
+                # 必填字段检查
+                if not book_ID or not book_type or not total_copy or not title or not author or not year:
+                    raise MissingRequiredFieldError(f"Missing required field in book record: {row}")
+                # 类型和内容检查由Book构造函数完成
+                try:
+                    Book(book_ID, book_type, total_copy, title, author, year, keywords)
+                except Exception as e:
+                    raise CustomValueError(f"Invalid book record: {row}, error: {e}")
 
     def get_active_loan_count(self, loans):
         return sum(1 for loan in loans if loan['book_ID'] == self.book_ID and not loan.get('returned_date'))

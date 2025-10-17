@@ -92,12 +92,13 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                 elif choice == "1":
                     break
                 elif choice == "2":
+                    policy = current_user.get_policy()
                     total, physical, online = current_user.get_loan_count()
                     fines = current_user.get_total_fines()
-                    print(f"{current_user.role} {current_user.name}. Policies: maximum of {current_user.days_allowed} days, {current_user.quota} items. Current loans: {total} ({physical} physical / {online} online). Fines: $ {fines:.2f}")
+                    print(f"{current_user.role} {current_user.name}. Policies: maximum of {policy['days_allowed']} days, {policy['quota']} items. Current loans: {total} ({physical} physical / {online} online). Fines: $ {fines:.2f}")
                     break
                 elif choice == "3":
-                    active_loans = [l for l in current_user.loans if not l['returned_date']]
+                    active_loans = current_user.get_active_loans()
                     print(f"You currently have {len(active_loans)} loan(s).")
                     for idx, l in enumerate(sorted(active_loans, key=lambda x: x['due_date'])):
                         b = book.Book.find_book_by_id(l['book_ID'])
@@ -139,19 +140,20 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                                     print("未找到该书籍ID，请重新输入。")
                                     continue
                                 # 先检查额度和罚款
+                                policy = current_user.get_policy()
                                 total, physical, online = current_user.get_loan_count()
                                 fines = current_user.get_total_fines()
                                 if fines > 0:
                                     print("Borrowing unavailable: unpaid fines. Review your loan details for more info.")
                                     break
-                                if total >= current_user.quota:
+                                if total >= policy['quota']:
                                     print("Borrowing unavailable: quota exceeded. Review your loan details for more info.")
                                     break
                                 if not b.can_borrow(loans):
                                     print("No available copies.")
                                     break
                                 # 借书成功
-                                due_date = (datetime.datetime.strptime(user.TODAY, '%d/%m/%Y') + datetime.timedelta(days=current_user.days_allowed)).strftime('%d/%m/%Y')
+                                due_date = (datetime.datetime.strptime(user.TODAY, '%d/%m/%Y') + datetime.timedelta(days=policy['days_allowed'])).strftime('%d/%m/%Y')
                                 new_loan = {'user_ID': current_user.user_ID, 'book_ID': b.book_ID, 'borrow_date': user.TODAY, 'due_date': due_date, 'returned_date': '', 'type': b.book_type}
                                 loans.append(new_loan)
                                 current_user.loans.append(new_loan)

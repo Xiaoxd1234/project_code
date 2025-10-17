@@ -89,11 +89,11 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                 elif choice == "1":
                     break
                 elif choice == "2":
-                    total, physical, online = current_user.get_loan_count()
-                    print(f"{current_user.role} {current_user.name}. Policies: maximum of {current_user.days_allowed} days, {current_user.quota} items. Current loans: {total} ({physical} physical / {online} online).")
+                    policy = current_user.get_policy()
+                    print(f"{current_user.role} {current_user.name}. Policies: maximum of {policy['days_allowed']} days, {policy['quota']} items. Current loans: {len(current_user.get_active_loans())}.")
                     break
                 elif choice == "3":
-                    active_loans = [l for l in current_user.loans if not l['returned_date']]
+                    active_loans = current_user.get_active_loans()
                     print(f"You currently have {len(active_loans)} loan(s).")
                     for idx, l in enumerate(sorted(active_loans, key=lambda x: x['due_date'])):
                         b = book.Book.find_book_by_id(l['book_ID'])

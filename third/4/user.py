@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import csv
 import datetime
 import re
-
+from custom_errors import *
 TODAY = "15/09/2025"
 
 class User(ABC):
@@ -13,6 +13,25 @@ class User(ABC):
     users = []
 
     def __init__(self, user_ID, name, password, role, department):
+        # Validate user ID
+        if not user_ID or not isinstance(user_ID, str):
+            raise CustomValueError("User ID must be a non-empty string")
+        
+        # Validate name
+        if not name or not all(word.isalpha() for word in name.split()):
+            raise CustomValueError("Name must contain only alphabetic characters")
+        
+        # Validate password
+        if not password:
+            raise CustomValueError("Password cannot be empty")
+        
+        # Validate department
+        valid_departments = ["IT", "Business", "Arts", "Science", "Engineering", "Education", "Medicine", "Library"]
+        if role in ["Student", "Staff"] and department not in valid_departments:
+            raise CustomValueError(f"Invalid department for {role}: {department}")
+        if role == "Others" and department:
+            raise CustomValueError("Department must be empty for Others")
+        
         self.user_ID = user_ID
         self.name = name
         self.password = password

@@ -55,21 +55,32 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
         attempts = 3
         current_user = None
         while attempts > 0:
-            user_id = input("Login as: ").strip()
-            if user_id.lower() == "quit":
-                print("Goodbye!")
-                return
-            password = input("Password: ").strip()
-            u = user.User.find_user_by_id(user_id)
-            if not u or not u.check_password(password):
-                attempts -= 1
-                if attempts > 0:
-                    print(f"Invalid credentials. {attempts} attempt(s) remaining.")
+            try:
+                user_id = input("Login as: ").strip()
+                if user_id.lower() == "quit":
+                    print("Goodbye!")
+                    return
+                if not user_id:
+                    raise CustomValueError("User ID cannot be empty")
+                
+                password = input("Password: ").strip()
+                if not password:
+                    raise CustomValueError("Password cannot be empty")
+                
+                u = user.User.find_user_by_id(user_id)
+                if not u or not u.check_password(password):
+                    attempts -= 1
+                    if attempts > 0:
+                        print(f"Invalid credentials. {attempts} attempt(s) remaining.")
+                    else:
+                        print("Sorry you're out of attempts. Please contact your librarian for assistance.")
                 else:
-                    print("Sorry you're out of attempts. Please contact your librarian for assistance.")
-            else:
-                current_user = u
-                break
+                    current_user = u
+                    break
+            except CustomValueError as e:
+                print(f"Input error: {e}")
+            except Exception as e:
+                print(f"Unexpected error during login: {e}")
         if not current_user:
             continue
         # 登录成功，进入主菜单
@@ -144,22 +155,24 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                                 # 先检查额度和罚款
                                 total, physical, online = current_user.get_loan_count()
                                 fines = current_user.get_total_fines()
-                                if fines > 0:
-                                    print("Borrowing unavailable: unpaid fines. Review your loan details for more info.")
+                                try:
+                                    if fines > 0:
+                                        raise CustomOperationError("Borrowing unavailable: unpaid fines. Review your loan details for more info.")
+                                    if total >= current_user.quota:
+                                        raise CustomLimitError("Borrowing unavailable: quota exceeded. Review your loan details for more info.")
+                                    if not b.can_borrow(loans):
+                                        raise CustomOperationError("No available copies.")
+                                    
+                                    # 借书成功
+                                    due_date = (datetime.datetime.strptime(user.TODAY, '%d/%m/%Y') + datetime.timedelta(days=current_user.days_allowed)).strftime('%d/%m/%Y')
+                                    new_loan = {'user_ID': current_user.user_ID, 'book_ID': b.book_ID, 'borrow_date': user.TODAY, 'due_date': due_date, 'returned_date': '', 'type': b.book_type}
+                                    loans.append(new_loan)
+                                    current_user.loans.append(new_loan)
+                                    print(f"You have borrowed '{b.title}' by {b.author} ({b.year}). Due: {due_date}.")
                                     break
-                                if total >= current_user.quota:
-                                    print("Borrowing unavailable: quota exceeded. Review your loan details for more info.")
+                                except CustomError as e:
+                                    print(f"Borrowing error: {e}")
                                     break
-                                if not b.can_borrow(loans):
-                                    print("No available copies.")
-                                    break
-                                # 借书成功
-                                due_date = (datetime.datetime.strptime(user.TODAY, '%d/%m/%Y') + datetime.timedelta(days=current_user.days_allowed)).strftime('%d/%m/%Y')
-                                new_loan = {'user_ID': current_user.user_ID, 'book_ID': b.book_ID, 'borrow_date': user.TODAY, 'due_date': due_date, 'returned_date': '', 'type': b.book_type}
-                                loans.append(new_loan)
-                                current_user.loans.append(new_loan)
-                                print(f"You have borrowed '{b.title}' by {b.author} ({b.year}). Due: {due_date}.")
-                                break
                         elif cmd.lower().startswith("return "):
                             return_id = cmd[7:].strip()
                             # 找到最早到期的未归还副本
@@ -185,7 +198,26 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                                 print(f"Returned '{b.title}' by {b.author} ({b.year}). Overdue by {overdue_days} day(s). Fine: $ {fine:.2f}")
                             else:
                                 print(f"Returned '{b.title}' by {b.author} ({b.year}).")
-                            loan_to_return['returned_date'] = user.TODAY
+                            try:
+                                if not loan_to_return:
+                                    raise CustomOperationError(f"No loan record for {return_id}.")
+                                if b is None:
+                                    raise BookNotFoundError(f"Book with ID {return_id} not found.")
+                                
+                                # 计算罚款
+                                grace, fine_per_day = current_user.get_fine_policy()
+                                due = datetime.datetime.strptime(loan_to_return['due_date'], '%d/%m/%Y')
+                                today = datetime.datetime.strptime(user.TODAY, '%d/%m/%Y')
+                                overdue_days = (today - due).days - grace
+                                fine = 0.0
+                                if b.is_physical_book() and overdue_days > 0:
+                                    fine = overdue_days * fine_per_day
+                                    print(f"Returned '{b.title}' by {b.author} ({b.year}). Overdue by {overdue_days} day(s). Fine: $ {fine:.2f}")
+                                else:
+                                    print(f"Returned '{b.title}' by {b.author} ({b.year}).")
+                                loan_to_return['returned_date'] = user.TODAY
+                            except CustomError as e:
+                                print(f"Return error: {e}")
                         elif cmd.lower().startswith("renew "):
                             renew_id = cmd[6:].strip()
                             # 找到最早到期且未归还的副本
@@ -213,9 +245,30 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                                 print("Renewal denied: This book is already overdue.")
                                 continue
                             # 续借成功
-                            loan_to_renew['due_date'] = new_due.strftime('%d/%m/%Y')
-                            loan_to_renew['renewed'] = True
-                            print(f"Renew '{b.title}' by {b.author} ({b.year}) successfully. New due date: {loan_to_renew['due_date']}")
+                            try:
+                                if not loan_to_renew:
+                                    raise CustomOperationError(f"No loan record for {renew_id}.")
+                                if b is None:
+                                    raise BookNotFoundError(f"Book with ID {renew_id} not found.")
+                                
+                                # 续借资格判断
+                                fines = current_user.get_total_fines()
+                                if fines > 0:
+                                    raise CustomOperationError("Renewal denied: You have unpaid fines.")
+                                if current_user.has_renewed(renew_id):
+                                    raise CustomLimitError("Renewal unavailable: Each book can only be renewed once.")
+                                due = datetime.datetime.strptime(loan_to_renew['due_date'], '%d/%m/%Y')
+                                today = datetime.datetime.strptime(user.TODAY, '%d/%m/%Y')
+                                new_due = due + datetime.timedelta(days=5)
+                                if new_due < today:
+                                    raise CustomDateError("Renewal denied: This book is already overdue.")
+                                
+                                # 续借成功
+                                loan_to_renew['due_date'] = new_due.strftime('%d/%m/%Y')
+                                loan_to_renew['renewed'] = True
+                                print(f"Renew '{b.title}' by {b.author} ({b.year}) successfully. New due date: {loan_to_renew['due_date']}")
+                            except CustomError as e:
+                                print(f"Renewal error: {e}")
                         else:
                             continue
                     break
