@@ -69,8 +69,8 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
         if not current_user:
             continue
         # 登录成功，进入主菜单
+        print(f"Logged in as {current_user}")
         while True:
-            print(f"Logged in as {current_user}")
             print("="*34)
             print("My Library Account")
             print("0. Quit")
