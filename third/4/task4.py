@@ -35,16 +35,38 @@ class loan:
 
 
 def load_data(user_file, book_file, loan_file):
-    user.User.load_users_from_csv(user_file)
-    book.Book.load_books_from_csv(book_file)
-    loans = loan.load_loans_from_csv(loan_file)
+    try:
+        user.User.load_users_from_csv(user_file)
+        print(f"Loaded {len(user.User.users)} users from {user_file}")
+    except (FileNotFoundError, CustomError) as e:
+        print(f"Error loading users: {e}")
+        return []
+    
+    try:
+        book.Book.load_books_from_csv(book_file)
+        print(f"Loaded {len(book.Book.books)} books from {book_file}")
+    except (FileNotFoundError, CustomError) as e:
+        print(f"Error loading books: {e}")
+        return []
+    
+    try:
+        loans = loan.load_loans_from_csv(loan_file)
+        print(f"Loaded {len(loans)} loan records from {loan_file}")
+    except (FileNotFoundError, CustomError) as e:
+        print(f"Error loading loans: {e}")
+        return []
+    
     # 关联用户和图书的借阅信息
     for l in loans:
-        u = user.User.find_user_by_id(l['user_ID'])
-        b = book.Book.find_book_by_id(l['book_ID'])
-        if u and b:
-            l['type'] = b.book_type
-            u.loans.append(l)
+        try:
+            u = user.User.find_user_by_id(l['user_ID'])
+            b = book.Book.find_book_by_id(l['book_ID'])
+            if u and b:
+                l['type'] = b.book_type
+                u.loans.append(l)
+        except (UserNotFoundError, BookNotFoundError) as e:
+            print(f"Warning: Skipping invalid loan record - {e}")
+            continue
     return loans
 
 
@@ -108,10 +130,11 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                 elif choice == "2":
                     total, physical, online = current_user.get_loan_count()
                     fines = current_user.get_total_fines()
-                    print(f"{current_user.role} {current_user.name}. Policies: maximum of {current_user.days_allowed} days, {current_user.quota} items. Current loans: {total} ({physical} physical / {online} online). Fines: $ {fines:.2f}")
+                    policy = current_user.get_policy()
+                    print(f"{current_user.role} {current_user.name}. Policies: maximum of {policy['days_allowed']} days, {policy['quota']} items. Current loans: {total} ({physical} physical / {online} online). Fines: $ {fines:.2f}")
                     break
                 elif choice == "3":
-                    active_loans = [l for l in current_user.loans if not l['returned_date']]
+                    active_loans = current_user.get_active_loans()
                     print(f"You currently have {len(active_loans)} loan(s).")
                     for idx, l in enumerate(sorted(active_loans, key=lambda x: x['due_date'])):
                         b = book.Book.find_book_by_id(l['book_ID'])
@@ -155,16 +178,17 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                                 # 先检查额度和罚款
                                 total, physical, online = current_user.get_loan_count()
                                 fines = current_user.get_total_fines()
+                                policy = current_user.get_policy()
                                 try:
                                     if fines > 0:
                                         raise CustomOperationError("Borrowing unavailable: unpaid fines. Review your loan details for more info.")
-                                    if total >= current_user.quota:
+                                    if total >= policy['quota']:
                                         raise CustomLimitError("Borrowing unavailable: quota exceeded. Review your loan details for more info.")
                                     if not b.can_borrow(loans):
                                         raise CustomOperationError("No available copies.")
                                     
                                     # 借书成功
-                                    due_date = (datetime.datetime.strptime(user.TODAY, '%d/%m/%Y') + datetime.timedelta(days=current_user.days_allowed)).strftime('%d/%m/%Y')
+                                    due_date = (datetime.datetime.strptime(user.TODAY, '%d/%m/%Y') + datetime.timedelta(days=policy['days_allowed'])).strftime('%d/%m/%Y')
                                     new_loan = {'user_ID': current_user.user_ID, 'book_ID': b.book_ID, 'borrow_date': user.TODAY, 'due_date': due_date, 'returned_date': '', 'type': b.book_type}
                                     loans.append(new_loan)
                                     current_user.loans.append(new_loan)
@@ -176,7 +200,7 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                         elif cmd.lower().startswith("return "):
                             return_id = cmd[7:].strip()
                             # 找到最早到期的未归还副本
-                            active_loans = [l for l in current_user.loans if l['book_ID'] == return_id and not l['returned_date']]
+                            active_loans = [l for l in current_user.get_active_loans() if l['book_ID'] == return_id]
                             if not active_loans:
                                 print(f"No loan record for {return_id}.")
                                 continue
@@ -221,7 +245,7 @@ def main(user_file: str, book_file:str, loan_file:str) -> None:
                         elif cmd.lower().startswith("renew "):
                             renew_id = cmd[6:].strip()
                             # 找到最早到期且未归还的副本
-                            active_loans = [l for l in current_user.loans if l['book_ID'] == renew_id and not l.get('returned_date')]
+                            active_loans = [l for l in current_user.get_active_loans() if l['book_ID'] == renew_id]
                             if not active_loans:
                                 print(f"No loan record for {renew_id}.")
                                 continue

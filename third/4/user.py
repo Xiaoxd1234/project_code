@@ -37,8 +37,6 @@ class User(ABC):
         self.password = password
         self.role = role
         self.department = department or ""
-        self.days_allowed = None
-        self.quota = None
         self.loans = []
         User.users.append(self)
 
@@ -47,6 +45,15 @@ class User(ABC):
 
     def is_library_staff(self) -> bool:
         return self.role == "Staff" and self.department == "Library"
+
+    @abstractmethod
+    def get_policy(self)->dict:
+        """返回用户的借阅政策信息"""
+        pass
+
+    def get_active_loans(self):
+        """返回用户的活跃借阅记录"""
+        return [loan for loan in self.loans if not loan.get('returned_date')]
 
     def check_password(self, password):
         return self.password == password
@@ -125,37 +132,64 @@ class User(ABC):
 
     @staticmethod
     def load_users_from_csv(file_path):
+        from custom_errors import MissingRequiredFieldError, CustomValueError
         User.users.clear()
         with open(file_path, newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                user_id = row['user_id']
-                name = row['name']
-                password = row['password']
-                role = row['role']
+                user_id = row.get('user_id')
+                name = row.get('name')
+                password = row.get('password')
+                role = row.get('role')
                 department = row.get('department', "")
-                if user_id.startswith('s'):
-                    Student(user_id, name, password, department)
-                elif user_id.startswith('e'):
-                    Staff(user_id, name, password, department)
-                elif user_id.startswith('o'):
-                    Others(user_id, name, password)
+                
+                # 必填字段检查
+                if not user_id or not name or not password or not role:
+                    raise MissingRequiredFieldError(f"Missing required field in user record: {row}")
+                
+                # 创建用户对象时处理可能的异常
+                try:
+                    if user_id.startswith('s'):
+                        Student(user_id, name, password, department)
+                    elif user_id.startswith('e'):
+                        Staff(user_id, name, password, department)
+                    elif user_id.startswith('o'):
+                        Others(user_id, name, password)
+                    else:
+                        raise CustomValueError(f"Invalid user ID format: {user_id}")
+                except Exception as e:
+                    raise CustomValueError(f"Invalid user record: {row}, error: {e}")
 
 class Student(User):
     def __init__(self, user_ID, name, password, department):
         super().__init__(user_ID, name, password, role="Student", department=department)
-        self.days_allowed = 10
-        self.quota = 4
+
+    def get_policy(self):
+        """返回学生的借阅政策"""
+        return {
+            'days_allowed': 10,
+            'quota': 4
+        }
 
 class Staff(User):
     def __init__(self, user_ID, name, password, department):
         super().__init__(user_ID, name, password, role="Staff", department=department)
-        self.days_allowed = 14
-        self.quota = 6
+
+    def get_policy(self):
+        """返回员工的借阅政策"""
+        return {
+            'days_allowed': 14,
+            'quota': 6
+        }
 
 class Others(User):
     def __init__(self, user_ID, name, password):
         super().__init__(user_ID, name, password, role="Others", department="")
-        self.days_allowed = 7
-        self.quota = 2
+
+    def get_policy(self):
+        """返回其他用户的借阅政策"""
+        return {
+            'days_allowed': 7,
+            'quota': 2
+        }
         

@@ -50,8 +50,12 @@ class Book:
             raise CustomTypeError("Keywords must be None, list, or str")
         if len(self.keywords) > 5:
             raise CustomValueError("A book can have at most 5 keywords")
-        assert self.total_copy > 0, "Book copies must be positive."
-        assert self.year > 0, "Book year must be positive."
+        
+        # 断言验证对象状态
+        assert self.book_ID, "Book ID should never be empty"
+        assert self.book_type in ["physical", "online"], "Book type must be valid"
+        assert isinstance(self.keywords, list), "Keywords should always be a list"
+        
         Book.books.append(self)
 
     def match_keywords(self, search_keywords):
