@@ -1,16 +1,16 @@
 import os
 import csv
+import re
+
 
 def read_book_collection(data_path: str) -> dict:
-    """
-    递归读取 data_path 下的图书馆书籍收藏，返回嵌套字典结构。
-    """
+    import os
+    import csv
     def helper(path):
         result = {}
         for entry in os.listdir(path):
             full_path = os.path.join(path, entry)
             if os.path.isdir(full_path):
-                # 递归处理子文件夹
                 result[entry.lower()] = helper(full_path)
             elif entry.endswith('.csv'):
                 category = entry[:-4].lower()
@@ -32,10 +32,7 @@ def read_book_collection(data_path: str) -> dict:
         return result
     return helper(data_path)
 
-def count_books_by_category(data: dict, book_cat: str) -> int:
-    """
-    递归统计指定类别的书籍数量。
-    """
+def count_books_by_category(data: dict, book_cat:str) -> int:
     count = 0
     for key, value in data.items():
         if key == book_cat:
@@ -44,10 +41,7 @@ def count_books_by_category(data: dict, book_cat: str) -> int:
             count += count_books_by_category(value, book_cat)
     return count
 
-def find_books_by_author(data: dict, author: str, path='') -> list:
-    """
-    递归查找指定作者的所有书籍，并添加 category 字段。
-    """
+def find_books_by_author(data:dict, author:str, path='') -> list:
     results = []
     for key, value in data.items():
         current_path = f"{path}/{key}"
@@ -61,10 +55,7 @@ def find_books_by_author(data: dict, author: str, path='') -> list:
             results.extend(find_books_by_author(value, author, current_path))
     return results
 
-def search_by_keywords(data: dict, keywords: list, similarity_threshold: float, path='') -> list:
-    """
-    递归查找与关键词相似度大于阈值的书籍，返回带 category 和 score 字段的列表。
-    """
+def search_by_keywords(data:dict, keywords: list, similarity_threshold, path='') -> list:
     def jaccard(a, b):
         set_a = set([w.lower() for w in a])
         set_b = set([w.lower() for w in b])
@@ -86,6 +77,38 @@ def search_by_keywords(data: dict, keywords: list, similarity_threshold: float, 
                     results.append(book_with_score)
         elif isinstance(value, dict):
             results.extend(search_by_keywords(value, keywords, similarity_threshold, current_path))
-    # 排序：先按相似度降序，再按年份降序
     results.sort(key=lambda x: (-x['score'], -x['year']))
     return results
+
+
+# WARNING!!! *DO NOT* REMOVE THIS LINE
+# THIS ENSURES THAT THE CODE BELLOW ONLY RUNS WHEN YOU HIT THE GREEN `Run` BUTTON, AND NOT THE BLUE `Test` BUTTON
+if __name__ == "__main__":
+    # 测试数据路径
+    data_path = "./data"
+    # 1. 读取书籍层级结构
+    books_dict = read_book_collection(data_path)
+    print("=== 书籍层级结构 ===")
+    print(books_dict)
+
+    # 2. 统计某类别书籍数量
+    category = "machinelearning"
+    count = count_books_by_category(books_dict, category)
+    print(f"\n=== '{category}' 类别书籍数量: {count} ===")
+
+    # 3. 查找某作者的所有书籍
+    author = "Eric Matthes"
+    author_books = find_books_by_author(books_dict, author)
+    print(f"\n=== 作者 '{author}' 的所有书籍 ===")
+    for book in author_books:
+        print(book)
+
+    # 4. 按关键词相似度搜索书籍
+    keywords = ["python", "programming"]
+    threshold = 0.25
+    search_results = search_by_keywords(books_dict, keywords, threshold)
+    print(f"\n=== 按关键词 {keywords} 相似度搜索结果 (阈值 {threshold}) ===")
+    for book in search_results:
+        print(book)
+
+
